@@ -1,0 +1,12 @@
+cli/Mk8SzsTool/bin/
+cli/Mk8SzsTool/obj/
+cli/publish/
+build/
+dist/
+ext/
+__pycache__/
+*.blend1
+test/ryujinx/
+test/pt/
+test/big.bfres
+test/out_info.json
