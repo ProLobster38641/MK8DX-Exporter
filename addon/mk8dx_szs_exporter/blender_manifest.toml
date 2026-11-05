@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+
+id = "mk8dx_szs_exporter"
+version = "1.0.0"
+name = "MK8DX SZS Exporter"
+tagline = "Export Mario Kart 8 Deluxe course_model.szs and course_kcl.szs"
+maintainer = "MK8DX SZS Exporter contributors"
+type = "add-on"
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+category = "Import-Export"
+
+[permissions]
+files = "Reads course templates and writes model/collision files"
