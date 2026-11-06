@@ -125,17 +125,8 @@ namespace Mk8SzsTool.Export
                 var userMap = new Dictionary<string, string>();
                 foreach (var kv in me.Textures)
                     userMap[kv.Key == "albedo" ? MaterialTemplates.AlbedoSampler(mat) : kv.Key] = kv.Value;
-                var neutralMap = new Dictionary<string, string>();
-                if (man.NeutralOtherSamplers)
-                    for (int i = 0; i < mat.Samplers.Count; i++)
-                    {
-                        string s = mat.Samplers.GetKey(i);
-                        if (!userMap.ContainsKey(s) && s != MaterialTemplates.AlbedoSampler(mat)) neutralMap[s] = NeutralFor(s);
-                    }
                 var missing = MaterialTemplates.SetTextures(mat, userMap, man.ForceRepeat);
-                MaterialTemplates.SetTextures(mat, neutralMap, false);
                 foreach (var s in missing) Warn($"Material '{me.Name}': template has no sampler '{s}'.");
-                foreach (var tr in mat.TextureRefs) wantedTextures.Add(tr.Name);
                 if (baseVariants != null && mat.ShaderAssign != null)
                 {
                     var (from, changed) = ShaderVariants.Snap(mat, baseVariants);
@@ -145,6 +136,16 @@ namespace Mk8SzsTool.Export
                         log($"INFO: Material '{me.Name}': adjusted to the course shader variation of base material '{from}'; changed: {string.Join(", ", changed)}");
                     }
                 }
+                // Choose defaults after adaptation: the compiled variation decides how normals unpack.
+                var neutralMap = new Dictionary<string, string>();
+                if (man.NeutralOtherSamplers)
+                    for (int i = 0; i < mat.Samplers.Count; i++)
+                    {
+                        string s = mat.Samplers.GetKey(i);
+                        if (!userMap.ContainsKey(s) && s != MaterialTemplates.AlbedoSampler(mat)) neutralMap[s] = NeutralFor(mat, s);
+                    }
+                MaterialTemplates.SetTextures(mat, neutralMap, false);
+                foreach (var tr in mat.TextureRefs) wantedTextures.Add(tr.Name);
                 newMats.Add(mat);
                 log($"Material {me.Name}: template={source} shader={mat.ShaderAssign?.ShaderArchiveName}/{mat.ShaderAssign?.ShadingModelName} samplers=[{string.Join(", ", Enumerable.Range(0, mat.Samplers.Count).Select(i => mat.Samplers.GetKey(i) + "=" + mat.TextureRefs[i].Name))}]");
             }
@@ -212,8 +213,11 @@ namespace Mk8SzsTool.Export
                 log($"Texture {te.Name}: {img.Width}x{img.Height} {fmt} mips={tex.MipCount}");
             }
             foreach (var n in NeutralTextures.Keys)
-                if (wantedTextures.Contains(n) && !res.Textures.ContainsKey(n))
-                    BntxTextures.AddOrReplace(res, BntxTextures.Create(n, NeutralTextures[n](), Syroot.NintenTools.NSW.Bntx.GFX.SurfaceFormat.BC1_UNORM, true, bntx));
+                if (wantedTextures.Contains(n))
+                    // Rebuild reserved defaults even on re-export from an older generated model.
+                    BntxTextures.AddOrReplace(res, BntxTextures.Create(n, NeutralTextures[n](),
+                        n.StartsWith("mk8exp_flat_normal") ? Syroot.NintenTools.NSW.Bntx.GFX.SurfaceFormat.R8_G8_B8_A8_UNORM
+                                                          : Syroot.NintenTools.NSW.Bntx.GFX.SurfaceFormat.BC1_UNORM, true, bntx));
 
             if (man.PruneTextures && man.Mode == "replace")
             {
@@ -229,10 +233,24 @@ namespace Mk8SzsTool.Export
             return res;
         }
 
-        static string NeutralFor(string sampler)
+        static string NeutralFor(Material mat, string sampler)
         {
-            if (sampler.StartsWith("_n")) return "mk8exp_flat_normal";
-            if (sampler.StartsWith("_s") || sampler.StartsWith("_e")) return "mk8exp_black";
+            // Sampler assignments map shader semantics to the material's physical slots.
+            var assigns = MaterialTemplates.Map(mat.ShaderAssign?.SamplerAssigns);
+            string role = assigns.FirstOrDefault(kv => kv.Value == sampler).Key ?? sampler;
+            // Bake0 multiplies AO/shadow visibility (white = unoccluded).
+            // Bake1 ADDS rgb * alpha * gsys_bake_light_scale to the course lighting.
+            // White here adds up to several times full brightness; no baked light is black.
+            if (role == "_b1") return "mk8exp_black";
+            if (role.StartsWith("_n"))
+            {
+                var options = MaterialTemplates.Map(mat.ShaderAssign?.ShaderOptions);
+                // BC1-style normals unpack [0,1] to [-1,1]. BC5-style normals already
+                // contain signed XY, so a zero XY sample, not 0.5, is the flat direction.
+                return options.GetValueOrDefault("gsys_normalmap_BC1", "1") == "0"
+                    ? "mk8exp_flat_normal_xy" : "mk8exp_flat_normal";
+            }
+            if (role.StartsWith("_s") || role.StartsWith("_e")) return "mk8exp_black";
             return "mk8exp_white";
         }
 
@@ -247,6 +265,7 @@ namespace Mk8SzsTool.Export
             ["mk8exp_white"] = () => Solid(255, 255, 255, 255),
             ["mk8exp_black"] = () => Solid(0, 0, 0, 255),
             ["mk8exp_flat_normal"] = () => Solid(128, 128, 255, 255),
+            ["mk8exp_flat_normal_xy"] = () => Solid(0, 0, 255, 255),
         };
 
         float[] ReadFloats(BinaryReader br, long off, int count)

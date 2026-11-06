@@ -47,7 +47,10 @@ def save_png(img, folder):
 
 def build_material(entry, folder, pack, warns):
     name = entry["name"]
-    mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    # Remember the source name independently of the visible missing-texture marker.
+    mat = next((m for m in bpy.data.materials if m.get("mk8dx_import_name") == name), None)
+    mat = mat or bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    mat["mk8dx_import_name"] = name
     if not getattr(mat, "node_tree", None):
         mat.use_nodes = True
     nt = mat.node_tree
@@ -58,17 +61,24 @@ def build_material(entry, folder, pack, warns):
     nt.links.new(bsdf.outputs[0], out.inputs[0])
     albedo_img = None
     y = 300
-    missing = [t for t in entry["textures"] if t.get("texture") and not t.get("found") and not t.get("duplicate")]
-    if missing:
-        warns.append(f"Material '{name}': textures not found: {', '.join(t['texture'] for t in missing)} ({missing[0].get('note', '')}). "
-                     "The material is created anyway; export uses neutral/template textures for them.")
+    missing = []
     for t in entry["textures"]:
-        if not t.get("file"):
-            if t.get("albedo") and t.get("found"):
-                warns.append(f"{name}: albedo '{t['texture']}' {t.get('note') or ''}")
-            continue
         is_normal = t["sampler"].startswith("_n")
-        img = load_rgba(t["file"], t["texture"], non_color=is_normal)
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.location = (-400, y); tex.label = f"{t['sampler']} {t['texture']}"
+        y -= 300
+        if not t.get("found") and t.get("texture"):
+            missing.append(t["texture"])
+        if not t.get("file"):
+            if t.get("found") and (t.get("albedo") or is_normal):
+                warns.append(f"{name}: '{t['texture']}' {t.get('note') or 'cannot be previewed'}")
+            continue
+        try:
+            img = load_rgba(t["file"], t["texture"], non_color=is_normal)
+        except (OSError, ValueError, struct.error, RuntimeError) as e:
+            missing.append(t["texture"])
+            warns.append(f"{name}: could not load '{t['texture']}' ({e}); slot left empty")
+            continue
         try:
             save_png(img, os.path.join(folder, "textures"))
             if pack:
@@ -76,8 +86,7 @@ def build_material(entry, folder, pack, warns):
         except Exception as e:
             warns.append(f"{name}: could not save {t['texture']}.png ({e}); image packed instead")
             img.pack()
-        tex = nt.nodes.new("ShaderNodeTexImage"); tex.image = img; tex.location = (-400, y); tex.label = f"{t['sampler']} {t['texture']}"
-        y -= 300
+        tex.image = img
         if t.get("albedo"):
             nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
             if entry.get("has_alpha"):
@@ -92,6 +101,16 @@ def build_material(entry, folder, pack, warns):
         elif is_normal and t["sampler"] == "_n0":
             nm = nt.nodes.new("ShaderNodeNormalMap"); nm.location = (-150, -250)
             nt.links.new(tex.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    missing = list(dict.fromkeys(missing))
+    mat["mk8dx_missing_textures"] = json.dumps(missing)
+    suffix = " (missing textures)" if missing else ""
+    # Keep the suffix visible even for names at Blender's byte-length limit.
+    base = name.encode("utf-8")[:63 - len(suffix)].decode("utf-8", errors="ignore")
+    mat.name = base + suffix
+    if missing:
+        details = "; ".join(t.get("note", "") or "" for t in entry["textures"] if t.get("texture") in missing)
+        warns.append(f"Material '{name}': missing textures: {', '.join(missing)}. "
+                     f"Imported available textures; missing slots are empty. {details}")
     s = mat.mk8dx
     s.bfmat_path = entry["bfmat"]
     s.bfmat_albedo = albedo_img
@@ -151,7 +170,8 @@ def run_import(op, context, bfmats=(), szs="", only="", tex_source=""):
             warns.append("The .blend is not saved yet: imported .bfmat copies are in a temporary cache folder. Save the .blend and re-import to keep them next to it.")
         for w in warns:
             op.report({"WARNING"}, w)
-        op.report({"INFO"}, f"Imported {len(mats)} material(s): {', '.join(m.name for m in mats[:8])}{' ...' if len(mats) > 8 else ''}  (files in {folder})")
+        level = {"WARNING"} if any(json.loads(m.get("mk8dx_missing_textures", "[]")) for m in mats) else {"INFO"}
+        op.report(level, f"Imported {len(mats)} material(s): {', '.join(m.name for m in mats[:8])}{' ...' if len(mats) > 8 else ''}  (files in {folder})")
         return {"FINISHED"}
     finally:
         shutil.rmtree(work, ignore_errors=True)

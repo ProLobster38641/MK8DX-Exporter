@@ -32,40 +32,41 @@ def fresh(name):
     bpy.ops.wm.read_homefile(use_empty=True); sc = bpy.context.scene; sc.mk8dx.template_file = T + "/tmpl.szs"
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(O, name + ".blend"))
 def imp(**kw): return run(bpy.ops.mk8dx.import_bfmat, filepath=O + "/Brick.bfmat", files=[{"name": "Brick.bfmat"}], directory=O, **kw)
+def material(): return next(m for m in bpy.data.materials if m.get("mk8dx_import_name") == "Brick")
 def tinfo(mat): return {t["texture"]: t for t in json.loads(mat.mk8dx.bfmat_info)["textures"]}
 def export(tag):
-    mat = bpy.data.materials["Brick"]
+    mat = material()
     bpy.ops.mesh.primitive_plane_add(size=4); bpy.context.object.data.materials.append(mat)
     out = os.path.join(O, tag, "course_model.szs"); r = run(bpy.ops.mk8dx.export_szs, filepath=out); return r, out
 # A: .bftex folder
 fresh("a"); d = folder("bftex", {"brick.bftex": "bftex"})
-r = imp(tex_folder=d); mat = bpy.data.materials.get("Brick"); im, _ = g.find_albedo_image(mat)
+r = imp(tex_folder=d); mat = material(); im, _ = g.find_albedo_image(mat)
 chk("A bftex folder import", r == {"FINISHED"} and im is not None and tuple(im.size) == (32, 32), str(r))
 r, out = export("A"); cli("decode-texture", SRC, "brick", O + "/a0.rgba"); cli("decode-texture", out, "brick", O + "/a1.rgba")
 chk("A export embeds bftex unchanged", r == {"FINISHED"} and os.path.isfile(O + "/a1.rgba") and open(O + "/a0.rgba", "rb").read() == open(O + "/a1.rgba", "rb").read())
 chk("A log says kept original", "kept original" in open(os.path.join(O, "A", "course_model_export_log.txt")).read())
 # B: PNG folder, different case, folder typed into the FILE field
 fresh("b"); d = folder("png", {"BRICK.png": (1, 0, 0, 1)})
-r = imp(tex_source=d); mat = bpy.data.materials["Brick"]; im, _ = g.find_albedo_image(mat)
+r = imp(tex_source=d); mat = material(); im, _ = g.find_albedo_image(mat)
 p2 = np.empty(16 * 16 * 4, np.float32); im.pixels.foreach_get(p2) if im else None
 chk("B png folder (case-insensitive, folder in file field)", r == {"FINISHED"} and im and tuple(im.size) == (16, 16) and p2[0] > .9 and p2[1] < .1)
 r, out = export("B"); cli("decode-texture", out, "brick", O + "/b1.rgba")
 chk("B export re-encodes png", r == {"FINISHED"} and rgba(O + "/b1.rgba")[..., 0].min() > 240 and rgba(O + "/b1.rgba")[..., 1].max() < 15)
 # C: mixed, subfolders: brick.bftex top + sub/mk8exp_white.png
 fresh("c"); d = folder("mixed", {"brick.bftex": "bftex", "sub/mk8exp_white.png": (1, 1, 1, 1)})
-r = imp(tex_folder=d, tex_subfolders=True); ti = tinfo(bpy.data.materials["Brick"])
+r = imp(tex_folder=d, tex_subfolders=True); ti = tinfo(material())
 chk("C mixed + subfolders both found", r == {"FINISHED"} and ti["brick"]["found"] and ti["mk8exp_white"]["found"], str({k: v["note"] for k, v in ti.items()}))
-r = imp(tex_folder=d, tex_subfolders=False); ti = tinfo(bpy.data.materials["Brick"])
+r = imp(tex_folder=d, tex_subfolders=False); ti = tinfo(material())
 chk("C without subfolders: sub not searched", ti["brick"]["found"] and not ti["mk8exp_white"]["found"] and "looked in" in (ti["mk8exp_white"]["note"] or ""))
 # D: duplicate names -> skipped with warning, material still created
 fresh("d"); d = folder("dup", {"brick.bftex": "bftex", "Brick.png": (0, 1, 0, 1)})
-r = imp(tex_folder=d); mat = bpy.data.materials.get("Brick"); ti = tinfo(mat); im, _ = g.find_albedo_image(mat)
+r = imp(tex_folder=d); mat = material(); ti = tinfo(mat); im, _ = g.find_albedo_image(mat)
 chk("D duplicate skipped, material created", r == {"FINISHED"} and mat and not ti["brick"]["found"] and ti["brick"].get("duplicate") and im is None, str(ti["brick"]))
 # E: missing (empty folder, no template)
 fresh("e"); bpy.context.scene.mk8dx.template_file = ""; d = folder("empty", {})
-r = imp(tex_folder=d); mat = bpy.data.materials.get("Brick"); ti = tinfo(mat)
+r = imp(tex_folder=d); mat = material(); ti = tinfo(mat)
 chk("E missing -> material, note lists where", r == {"FINISHED"} and mat and not ti["brick"]["found"] and d in ti["brick"]["note"], ti["brick"]["note"])
 # F: priority: dialog folder (red png) beats Template/other file (SRC has brick too)
 fresh("f"); d = folder("prio", {"brick.png": (0, 0, 1, 1)})
-r = imp(tex_folder=d, tex_source=SRC); ti = tinfo(bpy.data.materials["Brick"])
+r = imp(tex_folder=d, tex_source=SRC); ti = tinfo(material())
 chk("F dialog folder has priority", "prio" in (ti["brick"]["note"] or ""), ti["brick"]["note"])

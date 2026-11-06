@@ -59,3 +59,15 @@ GPU overlay on a neutral, flat Solid background. Materials/textures are not used
 active vertex-colour layers, material slots, object display colours or mesh data. Linked mesh objects
 are evaluated separately for their object collision defaults. Each viewport saves/restores its own
 changed shading properties; disabling the add-on or loading another file cleans up the draw handler.
+
+## Release 1.1.0 lighting defaults
+Neutral extra maps are selected after shader-variation adaptation, using shader sampler assignments
+rather than physical slot names. `_b0` is white (unoccluded AO/shadows); `_b1` is black
+(zero additive baked light). Normal defaults use exact RGBA8 UNORM data: unsigned mid-grey
+when `gsys_normalmap_BC1=1`, zero XY when the shader expects signed-style normal samples.
+Reserved defaults are regenerated on re-export. Course lighting options and environment bindings stay intact.
+Automatic template scoring penalizes emissive, unlit, multi-texture and reflection/shadow-only helpers.
+
+Imported materials store their source name separately from the visible missing-texture suffix.
+Missing texture slots remain empty and do not prevent other slots or materials importing.
+Re-import updates the same datablock and clears the marker when the missing textures are supplied.

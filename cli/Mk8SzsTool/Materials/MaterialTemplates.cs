@@ -163,6 +163,16 @@ namespace Mk8SzsTool.Materials
                     if (animated.Contains(m.Name)) { sc -= 15; why.Add("animated"); }
                     string ln = m.Name.ToLowerInvariant();
                     if (fx.Any(f => ln.Contains(f))) { sc -= 8; why.Add("effect-like name"); }
+                    var options = Map(m.ShaderAssign?.ShaderOptions);
+                    // A normal surface must respond to course lighting, not act as a light source.
+                    if (options.GetValueOrDefault("enable_emission") == "1") { sc -= 60; why.Add("emissive"); }
+                    if (options.GetValueOrDefault("enable_diffuse") == "0") { sc -= 40; why.Add("unlit"); }
+                    if (options.GetValueOrDefault("enable_multi_texture") == "1") { sc -= 10; why.Add("multi-texture"); }
+                    // Reflection/shadow-only helper materials are not visible course surfaces.
+                    foreach (var ri in m.RenderInfos)
+                        if (new[] { "gsys_cube_map_only", "gsys_dynamic_depth_shadow_only", "gsys_static_depth_shadow_only" }.Contains(ri.Key)
+                            && ri.Value.Data is string[] flags && flags.Any(v => v == "1" || v == "true"))
+                            { sc -= 100; why.Add("helper pass"); }
                     sc -= Math.Max(0, m.Samplers.Count - 4) * 2;
                     if (sc > bestScore) { bestScore = sc; best = (model, m, string.Join(", ", why)); }
                 }

@@ -57,7 +57,7 @@ chk("changed image -> albedo swapped, still bfmat clone", r == {"FINISHED"} and 
 # --- 5. missing textures: no source, template without them
 bpy.ops.wm.read_homefile(use_empty=True); sc = bpy.context.scene; sc.mk8dx.template_file = ""
 r = run(bpy.ops.mk8dx.import_bfmat, filepath=O + "/Brick.bfmat", files=[{"name": "Brick.bfmat"}], directory=O)
-m3 = bpy.data.materials.get("Brick")
+m3 = bpy.data.materials.get("Brick (missing textures)")
 chk("missing textures -> material still created, no error", r == {"FINISHED"} and m3 is not None and m3.mk8dx.bfmat_path, str(r))
 chk("missing noted", "not found" in m3.mk8dx.bfmat_info)
 # --- 6. import all materials from a .szs

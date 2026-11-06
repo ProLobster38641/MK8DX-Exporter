@@ -1,4 +1,4 @@
-# MK8DX SZS Exporter for Blender (1.0.0)
+# MK8DX SZS Exporter for Blender (1.1.0)
 
 Export a Blender track straight to **Mario Kart 8 Deluxe (Switch)** course files:
 
@@ -10,7 +10,7 @@ There's no Collada, OBJ or Switch Toolbox round trip. Tested with Blender 5.0. T
 > You need your own legally dumped copy of the game for the template `course_model.szs`. This project ships no game files.
 
 ## Install / update
-1. Download `mk8dx_szs_exporter_windows_1.0.zip` (or the unversioned Windows release zip) (don't unzip it).
+1. Download `mk8dx_szs_exporter_windows_1.1.zip` (or the unversioned Windows release zip) (don't unzip it).
 2. In Blender, go to **Edit > Preferences > Get Extensions**, open the **v** menu (top right), choose **Install from Disk...** and pick the zip.
 3. To update, install the new zip over the old one, then restart Blender.
 
@@ -32,6 +32,8 @@ Every Blender material becomes an MK8DX material with the same name, with its Ba
 
 The dialog remembers its options and Template file per .blend and in add-on preferences (across files/sessions when Blender saves preferences). Clearing the template field means automatic destination selection; it does not pin that destination as a new explicit template.
 
+Leave **Neutral extra maps** enabled for a new custom track. It uses white AO/shadow visibility (`_b0`) and **black added baked light** (`_b1`), not a white lightmap. The course's environment lighting, fog and bloom still apply; this is not an unlit/flat shader or a global darkening filter. Blender's studio lighting and colour management are different, so an exact viewport match is not guaranteed. Turn this option off only when keeping original maps with UVs that match them.
+
 Shader variations from the base course are kept unchanged. Imported materials with different shader settings are adapted to the closest known course variation when needed; this is an **INFO** note, not an error/warning. Detailed changes and the chosen template are in `*_export_log.txt`. Matching variations from a `.orig` backup or extra `.szs` are also recognised when their embedded shader archive is byte-identical. Adaptation may simplify the material's appearance; using materials from the base course is best.
 
 Files are written safely: a temp file is replaced into place, with retries if the file is locked, then checked after writing. Existing model outputs are backed up once as `*.orig`; existing backups are never replaced. The info bar lists every path saved. If anything fails you get an error, not a success message.
@@ -47,7 +49,7 @@ Files are written safely: a temp file is replaced into place, with retries if th
   - **Normal map (`_n0`):** connected through a Normal Map node.
   - **Other maps:** listed in Material Properties > MK8DX Export.
 - **Where files go:** PNGs and .bfmat copies are saved in a `<blend name>_mk8dx` folder next to the .blend (save the .blend first), and the images are packed by default.
-- **Missing textures:** the material is still created, with a note in the panel.
+- **Missing textures:** the material is still created using available textures, with empty nodes for missing slots. A warning lists the missing texture names and the material name ends in ` (missing textures)`. Importing again updates the same material and removes the marker once its textures are found.
 - **On export:** an imported material clones its linked .bfmat exactly. If Base Color still uses the imported image, unchanged, the original texture is copied in as-is. If you change the image, it replaces the albedo as usual.
 
 ## Start grid placeholder
@@ -101,15 +103,14 @@ mk8szs info | materials | extract-bfmat | import | yaz0-d | yaz0-c
   ```
   dotnet publish cli/Mk8SzsTool -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o cli/publish/win-x64
   ```
-- **Package:** copy `addon/mk8dx_szs_exporter`, put `mk8szs.exe` in its `bin/` folder, then run `python mkzip.py <folder> out.zip`.
-- **Tests:** headless Blender tests are in `test/` (`run_blender_test.sh blender_test6.py`, etc.). Set BLENDER to your Blender executable. The fixtures are synthetic, not game assets. Tests generate temporary exports and `test_scene.blend`; generated scenes/outputs are not part of the source release. The optional `blender_shader_test.py` uses your private dumped course files through environment variables (see its header).
+- **Package:** after publishing the Windows backend, run `python package_release.py`. It builds the Windows add-on and source zips in `dist/`, excluding private fixtures and generated files. For a custom package, put the executable in the add-on's `bin/` folder and run `python mkzip.py <folder> out.zip`.
+- **Tests:** headless Blender tests are in `test/` (`run_blender_test.sh blender_test6.py`, etc.). Set BLENDER to your Blender executable. Generate the synthetic fixture first with `mk8szs make-test-template test/tmpl.szs`, then `mk8szs extract-bfmat test/tmpl.szs mt_grass_template test/grass.bfmat`. The fixtures are synthetic, not game assets. Tests generate temporary exports and `test_scene.blend`; generated scenes/outputs are not part of the source release. Lighting defaults also have C# regressions: `dotnet run --project test/LightingTests -c Release`. Missing-texture imports are covered by `blender_test14.py`. The optional `blender_shader_test.py` uses your private dumped course files through environment variables (see its header).
 
-## Changelog
-- **1.0.0 — public release**: Template file is available in the model export dialog and shared with the N-panel; it persists with the export options. A blank template reads the destination's current file, then its `.orig` backup. Shader adaptation is informational (one short status note plus details in the log), and matching source-course variations are preserved. Collision preview uses flat type colours only (non-collision meshes neutral), with exact shading restoration. Safe replacement/backups, model and collision export, material import and the start grid are included.
-- **Beta 0.3.x**: .bfmat/.szs material import, texture folders with duplicate protection, start grid placeholder, persistent export options, default Visual + collision / Road 1 (`0x0000`), and the in-game shader-variation compatibility fix.
-- **Earlier previews**: initial BFRES/BNTX model export, collision export/type tools, course-folder destinations and verified writes.
-
-Upgrading from previews: install the new zip and restart Blender. Some early previews used a higher 1.x number; if Blender will not replace one, uninstall that preview in Preferences, restart, then install 1.0.0. Keep your .blend and `.orig` course backups.
+## What's new in 1.1.0
+- Fixed exports looking far too bright in-game. The default extra maps now add no baked light instead of adding a full-white lightmap, while the course's lighting still works normally.
+- Automatic material selection avoids glowing and reflection-only materials. Flat normal maps now match the template's normal-map format too.
+- Materials still import when textures are missing. Available textures are kept, missing slots stay empty, and a warning lists what is missing. Affected materials get ` (missing textures)` at the end of their name; re-import after finding the textures removes it.
+- Removed the old preview/beta patch notes. 1.0 is the first release; this section covers only this update.
 
 ## License
 The add-on is GPL-3.0-or-later (`LICENSE`). The bundled tool uses MIT-licensed BfresLibrary, KclLibrary and Syroot libraries, plus StbImageSharp (Unlicense/MIT). See `THIRD_PARTY_NOTICES.txt`. Mario Kart 8 Deluxe is a trademark of Nintendo; this is an unofficial fan tool.

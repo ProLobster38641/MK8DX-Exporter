@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../cli/Mk8SzsTool/Mk8SzsTool.csproj" />
+    <Reference Include="Syroot.BinaryData"><HintPath>../../ext/BfresLibrary/Libraries/Syroot.BinaryData.dll</HintPath></Reference>
+    <Reference Include="Syroot.NintenTools.NSW.Bntx"><HintPath>../../ext/BfresLibrary/Libraries/Syroot.NintenTools.NSW.Bntx.dll</HintPath></Reference>
+    <Reference Include="Syroot.Maths"><HintPath>../../ext/BfresLibrary/Libraries/Syroot.Maths.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

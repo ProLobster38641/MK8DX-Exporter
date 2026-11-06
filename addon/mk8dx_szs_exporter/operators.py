@@ -285,7 +285,7 @@ class MK8DX_OT_export(bpy.types.Operator, ExportHelper):
     default_template: EnumProperty(name="Default template", items=default_template_items,
                                    description="Original material cloned for Blender materials without their own choice")
     neutral_other: BoolProperty(name="Neutral extra maps", default=True,
-                                description="Point the template's other texture slots (shadow/bake/normal/spec) at neutral textures, so the original track's baked shadows don't appear on your mesh")
+                                description="Use unshadowed AO, zero added baked light, flat normals and no specular/emission maps; keep normal course lighting. Disable only to keep the template's maps with matching bake UVs")
     force_repeat: BoolProperty(name="Repeat (tile) textures", default=True, description="Set the albedo sampler to wrap/repeat")
     prune: BoolProperty(name="Remove unused original textures", default=True)
     keep_anims: BoolProperty(name="Keep template animations", default=True,

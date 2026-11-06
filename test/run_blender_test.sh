@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-rm -rf build/linux && mkdir -p build/linux && cp -r addon/mk8dx_szs_exporter build/linux/ && cp cli/publish/linux-x64/mk8szs build/linux/mk8dx_szs_exporter/bin/
+rm -rf build/linux && mkdir -p build/linux && cp -r addon/mk8dx_szs_exporter build/linux/ && mkdir -p build/linux/mk8dx_szs_exporter/bin && cp cli/publish/linux-x64/mk8szs build/linux/mk8dx_szs_exporter/bin/
 python3 mkzip.py build/linux/mk8dx_szs_exporter build/test_linux.zip
 B=${BLENDER:-blender}
 "$B" -b --factory-startup --command extension install-file -r user_default -e build/test_linux.zip

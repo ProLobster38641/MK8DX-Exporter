@@ -41,7 +41,7 @@ Commands:
                 if (args.Length == 0) { Console.WriteLine(Usage); return 1; }
                 switch (args[0])
                 {
-                    case "version": Console.WriteLine("mk8szs 1.0.0"); return 0;
+                    case "version": Console.WriteLine("mk8szs 1.1.0"); return 0;
                     case "export":
                         {
                             var man = Manifest.Load(args[1]);

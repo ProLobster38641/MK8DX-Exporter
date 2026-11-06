@@ -84,6 +84,8 @@ def find_albedo_image(mat):
             img = upstream(node.inputs["Base Color"])
             if img:
                 return img, warnings
+    if any(node.type == "BSDF_PRINCIPLED" for node in nt.nodes):
+        return None, warnings
     for node in nt.nodes:
         if node.type == "TEX_IMAGE" and node.image:
             return node.image, warnings
